@@ -49,6 +49,8 @@ export type RoutineStep = Readonly<{
   complete: boolean;
 }>;
 
+export const MAX_ROUTINE_STEPS = 15;
+
 export type Reminder = Readonly<{
   id: string;
   productId: string;

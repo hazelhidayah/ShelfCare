@@ -1,5 +1,5 @@
 import { err, Result } from "@/src/core/result";
-import { RoutineStep } from "@/src/domain/models";
+import { MAX_ROUTINE_STEPS, RoutineStep } from "@/src/domain/models";
 import { VersionedStorage } from "@/src/platform/versioned-storage";
 import { RoutineService } from "@/src/services/contracts";
 import { isRoutineList } from "./guards";
@@ -25,6 +25,9 @@ export class LocalRoutineService implements RoutineService {
     const clean = steps.map((step) => ({ ...step, name: step.name.trim(), instruction: step.instruction.trim() }));
     if (clean.length === 0 || clean.some((step) => !step.name || !step.instruction)) {
       return err("validation", "Keep at least one step and complete every routine field.");
+    }
+    if (clean.length > MAX_ROUTINE_STEPS) {
+      return err("validation", `A routine can have up to ${MAX_ROUTINE_STEPS} steps.`);
     }
     if (new Set(clean.map((step) => step.id)).size !== clean.length) {
       return err("validation", "Routine steps must be unique.");

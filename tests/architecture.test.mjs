@@ -31,3 +31,18 @@ test("only the composition root constructs service adapters", async () => {
     assert.doesNotMatch(source, /new Local\w+Service/, `${path.relative(root, file)} bypasses the composition root`);
   }
 });
+
+test("routine limits are shared by the editor and service", async () => {
+  const models = await readFile(path.join(root, "src/domain/models.ts"), "utf8");
+  const editor = await readFile(path.join(root, "src/features/routines/routine-editor-sheet.tsx"), "utf8");
+  const service = await readFile(path.join(root, "src/services/local/routine-service.ts"), "utf8");
+  assert.match(models, /MAX_ROUTINE_STEPS = 15/);
+  assert.match(editor, /MAX_ROUTINE_STEPS/);
+  assert.match(service, /clean\.length > MAX_ROUTINE_STEPS/);
+});
+
+test("data exports are restricted to ShelfCare storage", async () => {
+  const exporter = await readFile(path.join(root, "src/features/auth/export-local-data.ts"), "utf8");
+  assert.match(exporter, /SHELFCARE_STORAGE_PREFIX = "shelflife\."/);
+  assert.match(exporter, /startsWith\(SHELFCARE_STORAGE_PREFIX\)/);
+});
