@@ -49,6 +49,8 @@ export type RoutineStep = Readonly<{
   complete: boolean;
 }>;
 
+export type RoutinePeriod = "morning" | "night";
+
 export const MAX_ROUTINE_STEPS = 15;
 
 export type Reminder = Readonly<{

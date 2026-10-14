@@ -1,5 +1,5 @@
 import { err, Result } from "@/src/core/result";
-import { MAX_ROUTINE_STEPS, RoutineStep } from "@/src/domain/models";
+import { MAX_ROUTINE_STEPS, RoutinePeriod, RoutineStep } from "@/src/domain/models";
 import { VersionedStorage } from "@/src/platform/versioned-storage";
 import { RoutineService } from "@/src/services/contracts";
 import { isRoutineList } from "./guards";
@@ -13,15 +13,19 @@ const seedRoutine: RoutineStep[] = [
 ];
 
 export class LocalRoutineService implements RoutineService {
-  private readonly storage = new VersionedStorage("shelflife.routine", 1, seedRoutine, isRoutineList);
-  async getToday(): Promise<Result<readonly RoutineStep[]>> { return this.storage.read(); }
-  async toggle(stepId: string): Promise<Result<readonly RoutineStep[]>> {
-    const current = this.storage.read();
+  private readonly morningStorage = new VersionedStorage("shelflife.routine", 1, seedRoutine, isRoutineList);
+  private readonly nightStorage = new VersionedStorage<RoutineStep[]>("shelflife.routine.night", 1, [], isRoutineList);
+  private storageFor(period: RoutinePeriod) { return period === "morning" ? this.morningStorage : this.nightStorage; }
+
+  async get(period: RoutinePeriod): Promise<Result<readonly RoutineStep[]>> { return this.storageFor(period).read(); }
+  async toggle(period: RoutinePeriod, stepId: string): Promise<Result<readonly RoutineStep[]>> {
+    const storage = this.storageFor(period);
+    const current = storage.read();
     if (!current.ok) return current;
     if (!current.value.some((step) => step.id === stepId)) return err("not_found", "That routine step no longer exists.");
-    return this.storage.write(current.value.map((step) => step.id === stepId ? { ...step, complete: !step.complete } : step));
+    return storage.write(current.value.map((step) => step.id === stepId ? { ...step, complete: !step.complete } : step));
   }
-  async replace(steps: readonly RoutineStep[]): Promise<Result<readonly RoutineStep[]>> {
+  async replace(period: RoutinePeriod, steps: readonly RoutineStep[]): Promise<Result<readonly RoutineStep[]>> {
     const clean = steps.map((step) => ({ ...step, name: step.name.trim(), instruction: step.instruction.trim() }));
     if (clean.length === 0 || clean.some((step) => !step.name || !step.instruction)) {
       return err("validation", "Keep at least one step and complete every routine field.");
@@ -32,6 +36,6 @@ export class LocalRoutineService implements RoutineService {
     if (new Set(clean.map((step) => step.id)).size !== clean.length) {
       return err("validation", "Routine steps must be unique.");
     }
-    return this.storage.write(clean);
+    return this.storageFor(period).write(clean);
   }
 }

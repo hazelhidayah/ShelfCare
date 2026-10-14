@@ -1,5 +1,5 @@
 import { Result } from "@/src/core/result";
-import { BarcodeMatch, CalendarCheckIn, CalendarDay, CommunityPost, IngredientFinding, Insight, NewProduct, Product, Reminder, RoutineStep } from "@/src/domain/models";
+import { BarcodeMatch, CalendarCheckIn, CalendarDay, CommunityPost, IngredientFinding, Insight, NewProduct, Product, Reminder, RoutinePeriod, RoutineStep } from "@/src/domain/models";
 
 // Every bounded context owns its contract. UI code never imports an adapter.
 export interface ProductTrackingService {
@@ -17,9 +17,9 @@ export interface IngredientService {
 }
 
 export interface RoutineService {
-  getToday(): Promise<Result<readonly RoutineStep[]>>;
-  toggle(stepId: string): Promise<Result<readonly RoutineStep[]>>;
-  replace(steps: readonly RoutineStep[]): Promise<Result<readonly RoutineStep[]>>;
+  get(period: RoutinePeriod): Promise<Result<readonly RoutineStep[]>>;
+  toggle(period: RoutinePeriod, stepId: string): Promise<Result<readonly RoutineStep[]>>;
+  replace(period: RoutinePeriod, steps: readonly RoutineStep[]): Promise<Result<readonly RoutineStep[]>>;
 }
 
 export interface ReminderService {

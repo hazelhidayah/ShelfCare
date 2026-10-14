@@ -41,6 +41,14 @@ test("routine limits are shared by the editor and service", async () => {
   assert.match(service, /clean\.length > MAX_ROUTINE_STEPS/);
 });
 
+test("morning and night routines use independent storage", async () => {
+  const service = await readFile(path.join(root, "src/services/local/routine-service.ts"), "utf8");
+  assert.match(service, /"shelflife\.routine"/);
+  assert.match(service, /"shelflife\.routine\.night"/);
+  assert.match(service, /nightStorage[^\n]+\[\]/);
+  assert.match(service, /storageFor\(period: RoutinePeriod\)/);
+});
+
 test("data exports are restricted to ShelfCare storage", async () => {
   const exporter = await readFile(path.join(root, "src/features/auth/export-local-data.ts"), "utf8");
   assert.match(exporter, /SHELFCARE_STORAGE_PREFIX = "shelflife\."/);

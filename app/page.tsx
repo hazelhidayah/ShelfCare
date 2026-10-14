@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarcodeMatch, CalendarCheckIn, NewProduct, Product, RoutineStep } from "@/src/domain/models";
+import Image from "next/image";
+import { BarcodeMatch, CalendarCheckIn, NewProduct, Product, RoutinePeriod, RoutineStep } from "@/src/domain/models";
 import { createServiceContainer } from "@/src/services/container";
 import { useProductTracking } from "@/src/features/products/use-product-tracking";
 import { useRoutine } from "@/src/features/routines/use-routine";
@@ -21,16 +22,18 @@ import { MonthCalendarSheet } from "@/src/features/calendar/month-calendar-sheet
 import { AccountMode, AuthFlow } from "@/src/features/auth/auth-flow";
 import { AccountSheet } from "@/src/features/auth/account-sheet";
 import { exportShelfCareData } from "@/src/features/auth/export-local-data";
-import { BellRing, BookHeart, CalendarPlus, Clock3, Grid2X2, HardDrive, Heart, HeartHandshake, Home, List, PackagePlus, Palette, PencilLine, Plus, ScanBarcode, ShieldCheck, SmilePlus, UserRound } from "lucide-react";
+import { ProfileEditorSheet } from "@/src/features/auth/profile-editor-sheet";
+import { BellRing, BookHeart, CalendarPlus, Clock3, Copy, Grid2X2, HardDrive, Heart, HeartHandshake, Home, List, Moon, PackagePlus, Palette, PencilLine, Plus, ScanBarcode, ShieldCheck, SmilePlus, Sun, UserRound } from "lucide-react";
 import { ShelfIcon } from "@/src/ui/nav-icons";
 
 type Tab = "Today" | "Shelf" | "Routine" | "You";
-type Overlay = "add-choice" | "add" | "scan" | "community" | "notebook" | "checkin" | "calendar" | "account" | "auth" | "routine-editor" | null;
+type Overlay = "add-choice" | "add" | "scan" | "community" | "notebook" | "checkin" | "calendar" | "account" | "auth" | "routine-editor" | "profile-editor" | null;
 
 export default function ShelfCareApp() {
   const services = useMemo(() => createServiceContainer(), []);
   const productFeature = useProductTracking(services.products);
-  const routineFeature = useRoutine(services.routines);
+  const morningRoutine = useRoutine(services.routines, "morning");
+  const nightRoutine = useRoutine(services.routines, "night");
   const barcodeFeature = useBarcode(services.barcode);
   const calendarFeature = useCalendar(services.calendar);
   const insightFeature = useInsights(services.insights, calendarFeature.selectedDate);
@@ -42,9 +45,23 @@ export default function ShelfCareApp() {
   const [filter, setFilter] = useState("All");
   const [shelfLayout, setShelfLayout] = useState<"grid" | "list">("grid");
   const [accountMode, setAccountMode] = useState<AccountMode>("local");
+  const [routinePeriod, setRoutinePeriod] = useState<RoutinePeriod>("morning");
+  const [profileName, setProfileName] = useState("Nessa");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setAccountMode(window.localStorage.getItem("shelflife.account-mode") === "synced" ? "synced" : "local"), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem("shelflife.profile") ?? "null") as unknown;
+        if (typeof saved !== "object" || saved === null) return;
+        if ("name" in saved && typeof saved.name === "string" && saved.name.trim()) setProfileName(saved.name.trim());
+        if ("imageUrl" in saved && (typeof saved.imageUrl === "string" || saved.imageUrl === null)) setProfileImage(saved.imageUrl);
+      } catch { /* Keep the safe default profile when older data is malformed. */ }
+    }, 0);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -77,7 +94,24 @@ export default function ShelfCareApp() {
   const saveRoutine = async (nextSteps: readonly RoutineStep[]) => {
     const result = await routineFeature.replace(nextSteps);
     if (!result.ok) { flash(result.error.message); return; }
-    setOverlay(null); flash("Morning routine updated");
+    setOverlay(null); flash(`${routinePeriod === "morning" ? "Morning" : "Night"} routine updated`);
+  };
+  const copyOtherRoutine = async () => {
+    const source = routinePeriod === "morning" ? nightRoutine.steps : morningRoutine.steps;
+    const copied = source.map((step, index) => ({ ...step, id: `${routinePeriod}-${Date.now()}-${index}`, complete: false }));
+    const result = await routineFeature.replace(copied);
+    flash(result.ok ? `${routinePeriod === "morning" ? "Night" : "Morning"} routine copied` : result.error.message);
+  };
+  const saveProfile = (profile: { name: string; imageUrl: string | null }) => {
+    let existing: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem("shelflife.profile") ?? "null") as unknown;
+      if (typeof parsed === "object" && parsed !== null) existing = parsed as Record<string, unknown>;
+    } catch { /* Replace malformed profile data with the validated edit. */ }
+    try {
+      window.localStorage.setItem("shelflife.profile", JSON.stringify({ ...existing, ...profile }));
+      setProfileName(profile.name); setProfileImage(profile.imageUrl); setOverlay(null); flash("Profile updated");
+    } catch { flash("Your profile photo could not be saved. Try a smaller image."); }
   };
 
   const tabs: Array<{ name: Tab | "Add"; icon: React.ReactNode }> = [
@@ -88,14 +122,16 @@ export default function ShelfCareApp() {
     { name: "You", icon: <UserRound className="nav-icon" /> },
   ];
   const { products, shelfScore } = productFeature;
+  const routineFeature = routinePeriod === "morning" ? morningRoutine : nightRoutine;
   const { steps, doneCount } = routineFeature;
+  const otherRoutine = routinePeriod === "morning" ? nightRoutine : morningRoutine;
   const selectedDiaryDay = calendarFeature.selectedDay;
   const selectedDateLabel = new Intl.DateTimeFormat("en-SG", { weekday: "long", day: "numeric", month: "long" }).format(new Date(`${calendarFeature.selectedDate}T12:00:00Z`));
   const diaryDone = selectedDiaryDay?.routineCompleted ?? 0;
   const diaryTotal = selectedDiaryDay?.routineTotal ?? 5;
 
   const renderToday = () => <>
-    <section className="greeting-row"><div><p className="eyebrow date-label">{selectedDateLabel.toUpperCase()}</p><h1>Hello, Nessa <span aria-hidden="true">✦</span></h1></div><button className="avatar" onClick={() => setActiveTab("You")} aria-label="Open profile">N</button></section>
+    <section className="greeting-row"><div><p className="eyebrow date-label">{selectedDateLabel.toUpperCase()}</p><h1>Hello, {profileName} <span aria-hidden="true">✦</span></h1></div><button className="avatar" onClick={() => setActiveTab("You")} aria-label="Open profile">{profileImage ? <Image src={profileImage} alt="" width={43} height={43} unoptimized /> : profileName.charAt(0).toUpperCase()}</button></section>
     <section className="quick-actions" aria-label="Quick actions"><button onClick={() => setOverlay("scan")}><span><ScanBarcode aria-hidden="true" /></span><strong>Barcode<br />scan</strong></button><button onClick={() => selectedDiaryDay && setOverlay("checkin")} disabled={!selectedDiaryDay}><span><SmilePlus aria-hidden="true" /></span><strong>Log skin<br />& mood</strong></button><button onClick={openAdd}><span><PackagePlus aria-hidden="true" /></span><strong>Add<br />product</strong></button></section>
     <div className="calendar-label"><span className="card-kicker">YOUR WEEK</span><button onClick={() => setOverlay("calendar")}>View calendar <span>›</span></button></div>
     <section className="week-strip" aria-label="Week calendar">{calendarFeature.days.map((entry) => { const date = new Date(`${entry.date}T12:00:00Z`); return <button key={entry.date} className={`${calendarFeature.selectedDate === entry.date ? "selected" : ""} ${entry.date === "2026-07-31" ? "is-today" : ""}`} onClick={() => calendarFeature.selectDate(entry.date)} aria-label={`View diary for ${new Intl.DateTimeFormat("en-SG", { dateStyle: "full" }).format(date)}`}><span>{new Intl.DateTimeFormat("en-SG", { weekday: "narrow" }).format(date)}</span><strong>{String(date.getUTCDate()).padStart(2, "0")}</strong>{entry.date === "2026-07-31" && <i />}</button>; })}</section>
@@ -122,11 +158,11 @@ export default function ShelfCareApp() {
     </>;
   };
 
-  const renderRoutine = () => <><section className="page-header"><div><h1>Morning routine</h1><p>A calm start in {steps.length} steps.</p></div><div className="sun-icon">☼</div></section><section className="routine-hero"><div><span>Daily streak</span><strong>8 days</strong><p>Your most consistent week yet.</p></div><button onClick={() => setOverlay("routine-editor")}><PencilLine aria-hidden="true" />Edit routine</button></section>
+  const renderRoutine = () => <div className={`routine-page ${routinePeriod}`}><section className="page-header"><div><h1>{routinePeriod === "morning" ? "Morning" : "Night"} routine</h1><p>{steps.length === 0 ? `Build a ${routinePeriod} routine that works for you.` : `${routinePeriod === "morning" ? "A calm start" : "A gentle wind-down"} in ${steps.length} steps.`}</p></div><button className="routine-mode-toggle" onClick={() => setRoutinePeriod((current) => current === "morning" ? "night" : "morning")} aria-label={`Switch to ${routinePeriod === "morning" ? "night" : "morning"} routine`} title={`Switch to ${routinePeriod === "morning" ? "night" : "morning"} routine`}>{routinePeriod === "morning" ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}<span>{routinePeriod === "morning" ? "AM" : "PM"}</span></button></section>{steps.length > 0 && <section className="routine-hero"><div><span>Daily streak</span><strong>8 days</strong><p>Your most consistent week yet.</p></div><button onClick={() => setOverlay("routine-editor")}><PencilLine aria-hidden="true" />Edit routine</button></section>}
     {routineFeature.error && <div className="service-error" role="alert"><span>{routineFeature.error.message}</span><button onClick={() => void routineFeature.refresh()}>Retry</button></div>}
-    <section className="routine-list">{steps.map((step, index) => <button key={step.id} className={step.complete ? "done" : ""} onClick={() => void routineFeature.toggle(step.id)}><span className="check">{step.complete ? "✓" : index + 1}</span><span><strong>{step.name}</strong><small>{step.instruction}</small></span><span className="step-time">{step.complete ? "Done" : "Start"}</span></button>)}</section>{steps.length > 0 && doneCount === steps.length && <button className="primary-button wide" onClick={() => flash("Morning routine logged")}>Log complete routine</button>}</>;
+    {steps.length === 0 ? <section className="routine-empty"><span className="routine-empty-icon">{routinePeriod === "morning" ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}</span><h2>Your {routinePeriod} routine is empty</h2><p>Add your own steps, or begin with a copy of your {routinePeriod === "morning" ? "night" : "morning"} routine.</p><button className="primary-button" onClick={() => setOverlay("routine-editor")}><Plus aria-hidden="true" />Create {routinePeriod} routine</button>{otherRoutine.steps.length > 0 && <button className="copy-routine-button" onClick={() => void copyOtherRoutine()}><Copy aria-hidden="true" />Use {routinePeriod === "morning" ? "night" : "morning"} routine</button>}</section> : <section className="routine-list">{steps.map((step, index) => <button key={step.id} className={step.complete ? "done" : ""} onClick={() => void routineFeature.toggle(step.id)}><span className="check">{step.complete ? "✓" : index + 1}</span><span><strong>{step.name}</strong><small>{step.instruction}</small></span><span className="step-time">{step.complete ? "Done" : "Start"}</span></button>)}</section>}{steps.length > 0 && doneCount === steps.length && <button className="primary-button wide" onClick={() => flash(`${routinePeriod === "morning" ? "Morning" : "Night"} routine logged`)}>Log complete routine</button>}</div>;
 
-  const renderProfile = () => <><section className="profile-hero"><div className="profile-header"><div className="profile-avatar">N<span aria-hidden="true">✦</span></div><span className="profile-kicker">YOUR BEAUTY SPACE</span><h1>Nessa&apos;s skin diary</h1><p>Combination · sensitive · glow focused</p></div><section className="profile-stats"><div><strong>8</strong><span>day streak</span></div><div><strong>{products.length}</strong><span>products</span></div><div><strong>{shelfScore}%</strong><span>shelf health</span></div></section></section>
+  const renderProfile = () => <><section className="profile-hero"><div className="profile-header"><div className="profile-avatar">{profileImage ? <Image src={profileImage} alt={`${profileName}'s profile`} width={72} height={72} unoptimized /> : profileName.charAt(0).toUpperCase()}<button className="profile-edit-button" onClick={() => setOverlay("profile-editor")} aria-label="Edit profile name and picture"><PencilLine aria-hidden="true" /></button></div><h1>{profileName}&apos;s skin diary</h1><p>Combination · sensitive · glow focused</p></div><section className="profile-stats"><div><strong>8</strong><span>day streak</span></div><div><strong>{products.length}</strong><span>products</span></div><div><strong>{shelfScore}%</strong><span>shelf health</span></div></section></section>
     <div className="profile-section-label"><span>YOUR NOTEBOOK</span><small>{insightFeature.favourites.length} saved</small></div><button className="notebook-entry" onClick={() => setOverlay("notebook")}><span className="notebook-entry-icon"><BookHeart aria-hidden="true" /></span><span><strong>Saved insights</strong><small>{insightFeature.favourites.length === 0 ? "Keep the care notes you want to revisit" : `${insightFeature.favourites.length} saved ${insightFeature.favourites.length === 1 ? "note" : "notes"}`}</small></span><span>›</span></button>
     <div className="profile-section-label settings-label"><span>SETTINGS</span></div><section className="menu-list settings-menu"><button onClick={() => setOverlay("account")}><span className="menu-icon"><HardDrive aria-hidden="true" /></span><span className="menu-copy">Account & data <small className="account-mode-label">{accountMode === "local" ? "Local only" : "Synced"}</small></span><span>›</span></button><button onClick={() => products[0] && setSelectedProduct(products[0])}><span className="menu-icon"><ShieldCheck aria-hidden="true" /></span><span className="menu-copy">Skin profile & ingredients</span><span>›</span></button><button onClick={() => products[0] && setSelectedProduct(products[0])}><span className="menu-icon"><BellRing aria-hidden="true" /></span><span className="menu-copy">Reminder preferences</span><span>›</span></button><button onClick={() => flash("Wishlist is ready for your next save")}><span className="menu-icon"><Heart aria-hidden="true" /></span><span className="menu-copy">Wishlist</span><span>›</span></button><button onClick={() => setOverlay("community")}><span className="menu-icon"><HeartHandshake aria-hidden="true" /></span><span className="menu-copy">Friends & community</span><span>›</span></button><button onClick={() => flash("Appearance follows your device setting")}><span className="menu-icon"><Palette aria-hidden="true" /></span><span className="menu-copy">Appearance</span><span>›</span></button></section>
     <div className="care-note"><p><strong>A kinder beauty shelf.</strong><br />ShelfCare helps you use what you own and waste a little less.</p></div></>;
@@ -141,9 +177,10 @@ export default function ShelfCareApp() {
     {overlay === "notebook" && <InsightNotebookSheet insights={insightFeature.favourites} onClose={() => setOverlay(null)} onRemove={(id) => void insightFeature.removeFavourite(id)} />}
     {overlay === "checkin" && selectedDiaryDay && <CheckInSheet day={selectedDiaryDay} onClose={() => setOverlay(null)} onSave={saveCheckIn} />}
     {overlay === "calendar" && <MonthCalendarSheet selectedDate={calendarFeature.selectedDate} loggedDates={calendarFeature.loggedDates} onClose={() => setOverlay(null)} onSelect={(date) => { calendarFeature.selectDate(date); setOverlay(null); }} />}
-    {overlay === "routine-editor" && <RoutineEditorSheet steps={steps} onClose={() => setOverlay(null)} onSave={saveRoutine} />}
+    {overlay === "routine-editor" && <RoutineEditorSheet period={routinePeriod} steps={steps} onClose={() => setOverlay(null)} onSave={saveRoutine} />}
+    {overlay === "profile-editor" && <ProfileEditorSheet name={profileName} imageUrl={profileImage} onClose={() => setOverlay(null)} onSave={saveProfile} />}
     {overlay === "account" && <AccountSheet mode={accountMode} onClose={() => setOverlay(null)} onOpenAuth={() => setOverlay("auth")} onExport={() => { const count = exportShelfCareData(); flash(`Backup downloaded with ${count} saved ${count === 1 ? "section" : "sections"}`); }} />}
-    {overlay === "auth" && <AuthFlow initialStep={3} onClose={() => setOverlay("account")} onComplete={(name, mode) => { setAccountMode(mode); setOverlay(null); flash(mode === "local" ? "ShelfCare is ready in local mode" : `Welcome to ShelfCare, ${name} — sync is on`); }} />}
+    {overlay === "auth" && <AuthFlow initialStep={3} onClose={() => setOverlay("account")} onComplete={(name, mode) => { setAccountMode(mode); setProfileName(name); setOverlay(null); flash(mode === "local" ? "ShelfCare is ready in local mode" : `Welcome to ShelfCare, ${name} — sync is on`); }} />}
     {selectedProduct && <ProductDetailsSheet product={selectedProduct} ingredients={services.ingredients} reminders={services.reminders} onClose={() => setSelectedProduct(null)} onNotice={flash} />}
   </div></main>;
 }

@@ -30,7 +30,7 @@ The app brings product tracking, expiry awareness, daily skin notes, and routine
 | ▥ | **Barcode lookup** | Prefills product details from a scanned barcode, with manual entry as a fallback. |
 | ◷ | **Expiry awareness** | Surfaces products that need attention and supports reminder preferences. |
 | ✦ | **Daily check-ins** | Records skin condition, mood, products used, routine progress, and notes. |
-| ✓ | **Routine builder** | Adds, edits, reorders, and completes up to 15 routine steps. |
+| ✓ | **Routine builder** | Keeps separate morning and night routines with up to 15 editable steps each. |
 | ♡ | **Insight notebook** | Saves useful daily insights for later reference. |
 | ◫ | **Calendar history** | Makes day-to-day changes visible through seeded diary history. |
 | ⇩ | **Local data export** | Downloads a portable JSON backup containing only ShelfCare data. |
