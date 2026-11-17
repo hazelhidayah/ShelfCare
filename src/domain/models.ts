@@ -14,6 +14,7 @@ export type Product = Readonly<{
   description: string;
   favourite: boolean;
   addedAt: string;
+  ingredients: readonly string[];
 }>;
 
 export type NewProduct = Readonly<{
@@ -24,6 +25,7 @@ export type NewProduct = Readonly<{
   barcode?: string;
   imageUrl?: string | null;
   description?: string;
+  ingredients?: readonly string[];
 }>;
 
 export type BarcodeMatch = Readonly<{
@@ -75,13 +77,15 @@ export type Insight = Readonly<{
   favourite: boolean;
 }>;
 
+export type CalendarProductRef = Readonly<{ id: string; name: string }>;
+
 export type CalendarDay = Readonly<{
   date: string;
   skinStatus: "Calm" | "Glowy" | "Dry" | "Sensitive" | "Unlogged";
   mood: string;
   routineCompleted: number;
   routineTotal: number;
-  productsUsed: readonly string[];
+  productsUsed: readonly CalendarProductRef[];
   note: string | null;
   isFuture: boolean;
 }>;
@@ -92,6 +96,6 @@ export type CalendarCheckIn = Readonly<{
   mood: string;
   routineCompleted: number;
   routineTotal: number;
-  productsUsed: readonly string[];
+  productsUsed: readonly CalendarProductRef[];
   note: string | null;
 }>;

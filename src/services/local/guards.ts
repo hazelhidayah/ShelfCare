@@ -6,7 +6,8 @@ export const isProductList = (value: unknown): value is Product[] => Array.isArr
   isRecord(item) && typeof item.id === "string" && typeof item.name === "string" && typeof item.brand === "string" &&
   typeof item.category === "string" && typeof item.daysLeft === "number" && item.daysLeft >= 0 &&
   typeof item.tone === "string" && typeof item.icon === "string" && (typeof item.imageUrl === "string" || item.imageUrl === null) &&
-  typeof item.description === "string" && typeof item.favourite === "boolean" && typeof item.addedAt === "string"
+  typeof item.description === "string" && typeof item.favourite === "boolean" && typeof item.addedAt === "string" &&
+  Array.isArray(item.ingredients) && item.ingredients.every((ingredient) => typeof ingredient === "string")
 );
 
 export const isRoutineList = (value: unknown): value is RoutineStep[] => Array.isArray(value) && value.every((item) =>

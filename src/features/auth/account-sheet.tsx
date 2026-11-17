@@ -1,15 +1,17 @@
 "use client";
 
-import { Cloud, Download, HardDrive, X } from "lucide-react";
+import { Cloud, Download, HardDrive } from "lucide-react";
 import { AccountMode } from "./auth-flow";
+import { SheetCloseButton, useSheetClose } from "@/src/ui/sheet-controls";
 
 export function AccountSheet({ mode, onClose, onOpenAuth, onExport }: { mode: AccountMode; onClose: () => void; onOpenAuth: () => void; onExport: () => void }) {
   const local = mode === "local";
+  const requestClose = useSheetClose(onClose);
 
-  return <div className="modal-layer" role="dialog" aria-modal="true" aria-label="Account and data settings"><button className="modal-backdrop" onClick={onClose} aria-label="Close account settings" />
+  return <div className="modal-layer" role="dialog" aria-modal="true" aria-label="Account and data settings"><button className="modal-backdrop" onClick={requestClose} aria-label="Close account settings" />
     <section className="bottom-sheet account-sheet">
       <div className="sheet-handle" />
-      <div className="sheet-title"><div><span className="card-kicker">ACCOUNT & DATA</span><h2>{local ? "Saved on this device" : "Your data is synced"}</h2></div><button onClick={onClose} aria-label="Close account settings"><X /></button></div>
+      <div className="sheet-title"><div><h2>{local ? "Saved on this device" : "Your data is synced"}</h2></div><SheetCloseButton onClose={requestClose} label="Close account settings" /></div>
       <section className={`account-status ${local ? "local" : "synced"}`}>
         <span>{local ? <HardDrive aria-hidden="true" /> : <Cloud aria-hidden="true" />}</span>
         <div><strong>{local ? "Local mode" : "Online account"}</strong><p>{local ? "Your ShelfCare data is stored only in this browser. It is not uploaded or shared between devices." : "Your shelf, routines, and check-ins can be available whenever you sign in on another device."}</p></div>

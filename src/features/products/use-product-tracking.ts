@@ -36,7 +36,7 @@ export function useProductTracking(service: ProductTrackingService) {
   }, [service]);
 
   const shelfScore = useMemo(() => {
-    const safe = products.filter((item) => item.daysLeft > 30).length;
+    const safe = products.filter((item) => item.daysLeft >= 30).length;
     return Math.max(58, Math.round((safe / Math.max(products.length, 1)) * 44 + 56));
   }, [products]);
 

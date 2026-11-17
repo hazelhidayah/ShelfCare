@@ -2,7 +2,8 @@
 
 import { ChangeEvent, FormEvent, useState } from "react";
 import NextImage from "next/image";
-import { ImagePlus, Trash2, X } from "lucide-react";
+import { ImagePlus, Trash2 } from "lucide-react";
+import { SheetCloseButton, useSheetClose } from "@/src/ui/sheet-controls";
 
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const PROFILE_IMAGE_SIZE = 512;
@@ -37,6 +38,8 @@ export function ProfileEditorSheet({ name, imageUrl, onClose, onSave }: { name: 
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
   const initial = draftName.trim().charAt(0).toUpperCase() || "?";
+  const dirty = draftName !== name || draftImage !== imageUrl;
+  const requestClose = useSheetClose(onClose, dirty);
 
   const chooseImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -55,14 +58,14 @@ export function ProfileEditorSheet({ name, imageUrl, onClose, onSave }: { name: 
     onSave({ name: cleanName, imageUrl: draftImage });
   };
 
-  return <div className="modal-layer" role="dialog" aria-modal="true" aria-label="Edit profile"><button className="modal-backdrop" onClick={onClose} aria-label="Close profile editor" />
-    <section className="bottom-sheet profile-editor-sheet"><div className="sheet-handle" /><div className="sheet-title"><div><span className="card-kicker">YOUR PROFILE</span><h2>Make it yours</h2></div><button onClick={onClose} aria-label="Close profile editor"><X /></button></div>
+  return <div className="modal-layer" role="dialog" aria-modal="true" aria-label="Edit profile"><button className="modal-backdrop" onClick={requestClose} aria-label="Close profile editor" />
+    <section className="bottom-sheet profile-editor-sheet"><div className="sheet-handle" /><div className="sheet-title"><div><h2>Edit profile</h2></div><SheetCloseButton onClose={requestClose} label="Close profile editor" /></div>
       <form onSubmit={submit}><div className="profile-image-preview">{draftImage ? <NextImage src={draftImage} alt="Profile preview" width={104} height={104} unoptimized /> : <span>{initial}</span>}</div>
         <div className="profile-photo-actions"><label className="photo-picker"><ImagePlus aria-hidden="true" />{processing ? "Preparing photo…" : draftImage ? "Change photo" : "Choose photo"}<input type="file" accept="image/*" onChange={(event) => void chooseImage(event)} disabled={processing} /></label>{draftImage && <button type="button" onClick={() => setDraftImage(null)}><Trash2 aria-hidden="true" />Remove</button>}</div>
         <label>Display name<input value={draftName} onChange={(event) => setDraftName(event.target.value)} maxLength={40} autoComplete="name" /></label>
         <p className="profile-editor-note">Your photo is cropped to a square and stored with your ShelfCare data on this device.</p>
         {error && <p className="inline-error" role="alert">{error}</p>}
-        <div className="sheet-actions"><button type="button" className="scan-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={processing || !draftName.trim()}>Save profile</button></div>
+        <div className="sheet-actions"><button type="button" className="scan-button" onClick={requestClose}>Cancel</button><button className="primary-button" disabled={processing || !draftName.trim()}>Save profile</button></div>
       </form>
     </section>
   </div>;

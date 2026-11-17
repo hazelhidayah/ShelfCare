@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarCheckIn, CalendarDay } from "@/src/domain/models";
+import { addDays, startOfWeekKey, toDateKey } from "@/src/domain/date";
 import { CalendarService } from "@/src/services/contracts";
 
 export function useCalendar(service: CalendarService) {
   const [entries, setEntries] = useState<readonly CalendarDay[]>([]);
-  const [selectedDate, setSelectedDate] = useState("2026-07-31");
+  const today = useMemo(() => toDateKey(), []);
+  const [selectedDate, setSelectedDate] = useState(today);
 
   useEffect(() => {
     let active = true;
@@ -15,22 +17,26 @@ export function useCalendar(service: CalendarService) {
   }, [service]);
 
   const days = useMemo(() => {
-    const chosen = new Date(`${selectedDate}T12:00:00Z`);
-    const mondayOffset = (chosen.getUTCDay() + 6) % 7;
-    const monday = new Date(chosen);
-    monday.setUTCDate(chosen.getUTCDate() - mondayOffset);
+    const monday = startOfWeekKey(selectedDate);
     return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(monday);
-      date.setUTCDate(monday.getUTCDate() + index);
-      const key = date.toISOString().slice(0, 10);
-      return entries.find((day) => day.date === key) ?? { date: key, skinStatus: "Unlogged" as const, mood: "Not checked in", routineCompleted: 0, routineTotal: 5, productsUsed: [], note: null, isFuture: key > "2026-07-31" };
+      const key = addDays(monday, index);
+      const saved = entries.find((day) => day.date === key);
+      return saved ? { ...saved, isFuture: key > today } : { date: key, skinStatus: "Unlogged" as const, mood: "Not checked in", routineCompleted: 0, routineTotal: 5, productsUsed: [], note: null, isFuture: key > today };
     });
-  }, [entries, selectedDate]);
+  }, [entries, selectedDate, today]);
   const selectedDay = useMemo(() => days.find((day) => day.date === selectedDate) ?? null, [days, selectedDate]);
   const saveCheckIn = async (input: CalendarCheckIn) => {
     const result = await service.saveCheckIn(input);
     if (result.ok) setEntries((current) => current.some((day) => day.date === result.value.date) ? current.map((day) => day.date === result.value.date ? result.value : day) : [...current, result.value]);
     return result;
   };
-  return { days, selectedDate, selectedDay, loggedDates: entries.filter((day) => day.skinStatus !== "Unlogged").map((day) => day.date), selectDate: setSelectedDate, saveCheckIn };
+  const loggedDates = useMemo(() => entries.filter((day) => day.skinStatus !== "Unlogged").map((day) => day.date), [entries]);
+  const streak = useMemo(() => {
+    const logged = new Set(loggedDates);
+    let count = 0;
+    let cursor = today;
+    while (logged.has(cursor)) { count += 1; cursor = addDays(cursor, -1); }
+    return count;
+  }, [loggedDates, today]);
+  return { days, selectedDate, selectedDay, loggedDates, streak, today, selectDate: setSelectedDate, saveCheckIn };
 }
