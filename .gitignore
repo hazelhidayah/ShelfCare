@@ -41,6 +41,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/.impeccable/hook.cache.json
 
 # local workspace and reference artifacts
 /tmp/
